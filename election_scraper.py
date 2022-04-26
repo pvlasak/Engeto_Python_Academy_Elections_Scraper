@@ -1,12 +1,14 @@
 import requests as r
 from bs4 import BeautifulSoup as bs
 import csv
+import sys
 
-odkaz = "https://volby.cz/pls/ps2017nss/ps32?xjazyk=CZ&xkraj=12&xnumnuts=7103"
 odkaz_prvni_cast = "https://volby.cz/pls/ps2017nss/"
+
 
 def ziskej_odpoved(odkaz: str):
     return r.get(odkaz)
+
 
 def soup_generator(response) -> str:
     if response.status_code == 200:
@@ -14,15 +16,14 @@ def soup_generator(response) -> str:
         return bs(html_text, "html.parser")
     return ""
 
-def najdi_jmeno_okresu(cont: str) -> str:
-    h3_titles = cont.find_all("h3")
-    return h3_titles[1].text.split(":")[1].strip()
 
 def hledej_tabulky(cont: str) -> str:
     return cont.find_all("table", {"class" : "table"})
 
-def hledej_radky(table: str) -> str:
+
+def hledej_radky(table):
     return table.find_all("tr")
+
 
 def najdi_hodnoty_obec(row: str) -> dict:
     try:
@@ -31,7 +32,8 @@ def najdi_hodnoty_obec(row: str) -> dict:
         link = row.find_all("a")[0]["href"]
         return ({"Cislo obce" : number, "Nazev obec" : name, "url" : link})
     except IndexError:
-        print("indexy u radku neodpovidaji.")
+        pass
+
 
 def ziskej_vstupni_info(tabs: str) -> list:
     info_list = []
@@ -43,13 +45,16 @@ def ziskej_vstupni_info(tabs: str) -> list:
         info_list.remove(None)
     return info_list
 
+
 def ziskej_odkaz(i : int, list_obci : list) -> str:
     return list_obci[i]["url"]
+
 
 def rozdel_tabulky(soup:  str) -> str:
     tabulky_a = hledej_tabulky(soup)[0]
     tabulky_b = hledej_tabulky(soup)[1:]
     return tabulky_a, tabulky_b
+
 
 def najdi_hodnoty_volby(row: str) -> dict:
     try:
@@ -62,7 +67,8 @@ def najdi_hodnoty_volby(row: str) -> dict:
                      "Odevzdane obalky" : odevzdane_obalky, "Platne hlasy" : platne_hlasy
                 })
     except IndexError:
-        print("indexy u radku neodpovidaji.")
+        pass
+
 
 def ziskej_info_volby(tab: str) -> list:
     info_list = []
@@ -80,7 +86,8 @@ def najdi_hodnoty_strany(row: str) -> str:
         pl_hlasy = row.find_all("td")[2].text.replace("\xa0","")
         return strana, pl_hlasy
     except IndexError:
-         print("indexy u radku neodpovidaji.")
+        pass
+
 
 def ziskej_info_strany(tabs: str) -> dict:
     info_dict = {}
@@ -96,7 +103,8 @@ def ziskej_info_strany(tabs: str) -> dict:
 #        info_list.remove(None)
     return info_dict
 
-def zapis_header_do_souboru(nazev_okresu: str, strany: list) -> list:
+
+def zapis_header_do_souboru(soubor: str, strany: list) -> list:
     header = ["Cislo obce",
               "Nazev obec",
               "Volici v seznamu",
@@ -106,17 +114,19 @@ def zapis_header_do_souboru(nazev_okresu: str, strany: list) -> list:
               "Platne hlasy",
               *strany
              ]
-    f = open('vysledky_{0}.csv'.format(nazev_okresu), 'w+', newline = '')
+    f = open(soubor, 'w+', newline = '')
     writer = csv.DictWriter(f, header)
     writer.writeheader()
     f.close()
     return header
 
-def zapis_radky_do_souboru(nazev_okresu: str, header: list, slovnik_dat: dict) -> None:
-    f = open('vysledky_{0}.csv'.format(nazev_okresu), 'a', newline = '')
+
+def zapis_radky_do_souboru(soubor: str, header: list, slovnik_dat: dict) -> None:
+    f = open(soubor, 'a', newline = '')
     writer = csv.DictWriter(f, header)
     writer.writerow(slovnik_dat)
     f.close()
+
 
 def generuj_slovnik_dat_pro_zapis(slovnik_obec: dict, slovnik_volby: dict, slovnik_strany: dict) -> dict:
     slovnik_pro_zapis = {}
@@ -126,12 +136,14 @@ def generuj_slovnik_dat_pro_zapis(slovnik_obec: dict, slovnik_volby: dict, slovn
     slovnik_pro_zapis.pop("url")
     return slovnik_pro_zapis
 
-def hlavni():
-    response = ziskej_odpoved(odkaz)
+
+def hlavni(adresa, jmeno_souboru):
+    print(f"Stahuji data z URL: {adresa} .")
+    response = ziskej_odpoved(adresa)
     soup = soup_generator(response)
-    okres = najdi_jmeno_okresu(soup)
     tabulky = hledej_tabulky(soup)
     list_info_hodnot = ziskej_vstupni_info(tabulky)
+    print("Ukladam data do souboru...")
     for i in range(len(list_info_hodnot)):
         odkaz_obec = odkaz_prvni_cast + ziskej_odkaz(i, list_info_hodnot)
         response_obec = ziskej_odpoved(odkaz_obec)
@@ -141,11 +153,14 @@ def hlavni():
         dict_info_strany = ziskej_info_strany(tabulky_strany)
         hlavni_slovnik = generuj_slovnik_dat_pro_zapis(list_info_hodnot[i], list_info_volby[0], dict_info_strany)
         if i == 0:
-            header = zapis_header_do_souboru(okres, list(dict_info_strany.keys()))
-            zapis_radky_do_souboru(okres, header, hlavni_slovnik)
+            header = zapis_header_do_souboru(jmeno_souboru, list(dict_info_strany.keys()))
+            zapis_radky_do_souboru(jmeno_souboru, header, hlavni_slovnik)
         else:
-            zapis_radky_do_souboru(okres, header, hlavni_slovnik)
+            zapis_radky_do_souboru(jmeno_souboru, header, hlavni_slovnik)
+    print("Ukoncuji Web Scraper.")
 
 
 if __name__ == '__main__':
-    hlavni()
+    adresa = sys.argv[1]
+    jmeno_souboru = sys.argv[2]
+    hlavni(adresa, jmeno_souboru)
