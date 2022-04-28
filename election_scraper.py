@@ -14,11 +14,13 @@ def soup_generator(response) -> str:
     if response.status_code == 200:
         html_text = response.text
         return bs(html_text, "html.parser")
-    return ""
+    else:
+        print("URL Adresa je nespravná. Ukončuji.")
+        quit()
 
 
 def hledej_tabulky(cont: str) -> str:
-    return cont.find_all("table", {"class" : "table"})
+    return cont.find_all("table", {"class": "table"})
 
 
 def hledej_radky(table):
@@ -30,7 +32,10 @@ def najdi_hodnoty_obec(row: str) -> dict:
         number = row.find_all("td")[0].text
         name = row.find_all("td")[1].text
         link = row.find_all("a")[0]["href"]
-        return ({"Cislo obce" : number, "Nazev obec" : name, "url" : link})
+        return ({"Cislo obce": number,
+                 "Nazev obec": name,
+                 "url": link
+                })
     except IndexError:
         pass
 
@@ -63,8 +68,11 @@ def najdi_hodnoty_volby(row: str) -> dict:
         ucast = row.find_all("td")[5].text
         odevzdane_obalky = row.find_all("td")[6].text.replace("\xa0","")
         platne_hlasy = row.find_all("td")[7].text.replace("\xa0","")
-        return ({"Volici v seznamu" : volici, "Vydane obalky" : vydane_obalky, "Volebni ucast v %" : ucast,
-                     "Odevzdane obalky" : odevzdane_obalky, "Platne hlasy" : platne_hlasy
+        return ({"Volici v seznamu": volici,
+                 "Vydane obalky": vydane_obalky,
+                 "Volebni ucast v %": ucast,
+                 "Odevzdane obalky": odevzdane_obalky,
+                 "Platne hlasy": platne_hlasy
                 })
     except IndexError:
         pass
@@ -98,9 +106,7 @@ def ziskej_info_strany(tabs: str) -> dict:
                 continue
             else:
                 (key, value) = najdi_hodnoty_strany(line)
-                info_dict.setdefault(key,value)
-#    while None in info_list:
-#        info_list.remove(None)
+                info_dict.setdefault(key, value)
     return info_dict
 
 
@@ -113,8 +119,8 @@ def zapis_header_do_souboru(soubor: str, strany: list) -> list:
               "Odevzdane obalky",
               "Platne hlasy",
               *strany
-             ]
-    f = open(soubor, 'w+', newline = '')
+              ]
+    f = open(soubor, 'w+', newline='')
     writer = csv.DictWriter(f, header)
     writer.writeheader()
     f.close()
@@ -122,7 +128,7 @@ def zapis_header_do_souboru(soubor: str, strany: list) -> list:
 
 
 def zapis_radky_do_souboru(soubor: str, header: list, slovnik_dat: dict) -> None:
-    f = open(soubor, 'a', newline = '')
+    f = open(soubor, 'a', newline='')
     writer = csv.DictWriter(f, header)
     writer.writerow(slovnik_dat)
     f.close()
@@ -157,10 +163,21 @@ def hlavni(adresa, jmeno_souboru):
             zapis_radky_do_souboru(jmeno_souboru, header, hlavni_slovnik)
         else:
             zapis_radky_do_souboru(jmeno_souboru, header, hlavni_slovnik)
-    print("Ukoncuji Web Scraper.")
+    print("Ukončuji Web Scraper.")
 
 
 if __name__ == '__main__':
-    adresa = sys.argv[1]
-    jmeno_souboru = sys.argv[2]
-    hlavni(adresa, jmeno_souboru)
+    try:
+        adresa = sys.argv[1]
+        jmeno_souboru = sys.argv[2]
+        if odkaz_prvni_cast not in adresa:
+            print("Nezadal jsi správně URL adresu. Ukončuji.")
+            quit()
+        elif jmeno_souboru.split(".")[1] != "csv":
+            print("Koncovka souboru není správně zadaná. Ukončuji.")
+            quit()
+        else:
+            hlavni(adresa, jmeno_souboru)
+    except IndexError:
+        print("Nezadal jsi správně oba argumenty. Ukončuji program.")
+        quit()
