@@ -61,31 +61,32 @@ def rozdel_tabulky(soup:  str) -> str:
     return tabulky_a, tabulky_b
 
 
-def najdi_hodnoty_volby(row: str) -> dict:
+def najdi_hodnoty_volby(row: str) -> list:
     try:
         volici = row.find_all("td")[3].text.replace("\xa0","")
         vydane_obalky = row.find_all("td")[4].text.replace("\xa0","")
         ucast = row.find_all("td")[5].text
         odevzdane_obalky = row.find_all("td")[6].text.replace("\xa0","")
         platne_hlasy = row.find_all("td")[7].text.replace("\xa0","")
-        return ({"Volici v seznamu": volici,
-                 "Vydane obalky": vydane_obalky,
-                 "Volebni ucast v %": ucast,
-                 "Odevzdane obalky": odevzdane_obalky,
-                 "Platne hlasy": platne_hlasy
-                })
+        return [volici, vydane_obalky, ucast, odevzdane_obalky, platne_hlasy]
     except IndexError:
         pass
 
 
-def ziskej_info_volby(tab: str) -> list:
-    info_list = []
+def ziskej_info_volby(tab: str) -> dict:
+    info_dict = dict()
     lines = hledej_radky(tab)
     for line in lines:
-        info_list.append(najdi_hodnoty_volby(line))
-    while None in info_list:
-        info_list.remove(None)
-    return info_list
+        if najdi_hodnoty_volby(line) == None:
+            continue
+        else:
+            hodnoty = najdi_hodnoty_volby(line)
+            info_dict["Volici v seznamu"] = hodnoty[0]
+            info_dict["Vydane obalky"] = hodnoty[1]
+            info_dict["Volebni ucast v %"] = hodnoty[2]
+            info_dict["Odevzdane obalky"] = hodnoty[3]
+            info_dict["Platne hlasy"] = hodnoty[4]
+    return info_dict
 
 
 def najdi_hodnoty_strany(row: str) -> str:
@@ -155,9 +156,9 @@ def hlavni(adresa, jmeno_souboru):
         response_obec = ziskej_odpoved(odkaz_obec)
         soup_obec = soup_generator(response_obec)
         tabulka_volby, tabulky_strany = rozdel_tabulky(soup_obec)
-        list_info_volby = ziskej_info_volby(tabulka_volby)
+        dict_info_volby = ziskej_info_volby(tabulka_volby)
         dict_info_strany = ziskej_info_strany(tabulky_strany)
-        hlavni_slovnik = generuj_slovnik_dat_pro_zapis(list_info_hodnot[i], list_info_volby[0], dict_info_strany)
+        hlavni_slovnik = generuj_slovnik_dat_pro_zapis(list_info_hodnot[i], dict_info_volby, dict_info_strany)
         if i == 0:
             header = zapis_header_do_souboru(jmeno_souboru, list(dict_info_strany.keys()))
             zapis_radky_do_souboru(jmeno_souboru, header, hlavni_slovnik)
